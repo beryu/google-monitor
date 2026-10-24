@@ -156,9 +156,10 @@ public class MainActivity extends Activity {
         View preferred = null;
         LinearLayout row = null;
         int total = entries.size() + 1;
-        // Two gaming inputs normally give one row of exactly three cards.
+        int columns = Math.min(4, total);
+        // Four cards fit three HDMI ports and All Apps on a single TV row.
         for (int i = 0; i < total; i++) {
-            if (i % 3 == 0) {
+            if (i % columns == 0) {
                 row = new LinearLayout(this);
                 row.setGravity(Gravity.CENTER);
                 row.setClipChildren(false);
@@ -182,9 +183,16 @@ public class MainActivity extends Activity {
             row.addView(tile, lp);
             if (preferred == null || key.equals(selectedInput)) preferred = tile;
         }
+        // Keep incomplete final rows the same width per card.
+        for (int i = total; i % columns != 0; i++) {
+            View spacer = new View(this);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(188), 1);
+            lp.setMargins(dp(5), 0, dp(5), 0);
+            row.addView(spacer, lp);
+        }
         if (entries.isEmpty()) {
             TextView message = new TextView(this);
-            message.setText(error != null ? error : "テレビのHDMI入力名に「Switch」「PlayStation」を設定すると、ここに表示されます。");
+            message.setText(error != null ? error : "表示できるHDMI入力がありません。Google TVの入力設定をご確認ください。");
             message.setTextColor(0xFF626B70);
             message.setTextSize(14);
             message.setGravity(Gravity.CENTER);

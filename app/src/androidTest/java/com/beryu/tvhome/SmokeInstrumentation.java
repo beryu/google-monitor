@@ -60,8 +60,51 @@ public final class SmokeInstrumentation extends Instrumentation {
             sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
             waitForIdleSync();
             runOnMainSync(() -> require("apps".equals(activity.getCurrentFocus().getTag()), "Back restores apps focus"));
+            runOnMainSync(() -> activity.renderHome(Arrays.asList(
+                    new InputEntry("fixture-hdmi-1", "Nintendo Switch 2"),
+                    new InputEntry("fixture-hdmi-2", "PlayStation 5"),
+                    new InputEntry("fixture-hdmi-3", "Aux")), null));
+            waitForIdleSync();
+            runOnMainSync(() -> {
+                View decor = activity.getWindow().getDecorView();
+                View first = decor.findViewWithTag("fixture-hdmi-1");
+                View generic = decor.findViewWithTag("fixture-hdmi-3");
+                View apps = decor.findViewWithTag("apps");
+                require(generic != null && generic.isFocusable(), "Generic HDMI input is accessible");
+                require(first.getParent() == generic.getParent() && first.getParent() == apps.getParent(),
+                        "Three inputs and All Apps fit on one row");
+                require(Math.abs(first.getWidth() - apps.getWidth()) <= 1, "Cards have equal width");
+                generic.requestFocus();
+            });
+            sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_RIGHT);
+            waitForIdleSync();
+            runOnMainSync(() -> require("apps".equals(activity.getCurrentFocus().getTag()),
+                    "Generic HDMI navigates to All Apps"));
+            screenshot("four-card-preview.png");
+            runOnMainSync(() -> activity.renderHome(Arrays.asList(
+                    new InputEntry("fixture-hdmi-1", "HDMI 1"),
+                    new InputEntry("fixture-hdmi-2", "HDMI 2"),
+                    new InputEntry("fixture-hdmi-3", "HDMI 3"),
+                    new InputEntry("fixture-hdmi-4", "HDMI 4")), null));
+            waitForIdleSync();
+            runOnMainSync(() -> {
+                View decor = activity.getWindow().getDecorView();
+                View first = decor.findViewWithTag("fixture-hdmi-1");
+                View apps = decor.findViewWithTag("apps");
+                require(first.getParent() != apps.getParent(), "Additional inputs wrap to another row");
+                require(Math.abs(first.getWidth() - apps.getWidth()) <= 1, "Final row keeps card width");
+                decor.findViewWithTag("fixture-hdmi-4").requestFocus();
+            });
+            sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
+            waitForIdleSync();
+            runOnMainSync(() -> require("apps".equals(activity.getCurrentFocus().getTag()),
+                    "Wrapped row remains reachable with D-pad"));
+            // Return to the real input list after the fixtures.
+            runOnMainSync(() -> activity.showApps());
+            sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
+            waitForIdleSync();
             // Leave the real home visible after checking fixtures.
-            result.putString("stream", "PASS: home focus, D-pad movement, app drawer, Back, screenshots\n");
+            result.putString("stream", "PASS: home focus, D-pad movement, app drawer, settings, generic HDMI, four-card row, wrapping, Back\n");
             finish(-1, result);
         } catch (Throwable e) {
             result.putString("stream", "FAIL: " + e + "\n");
