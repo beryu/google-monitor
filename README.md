@@ -22,7 +22,7 @@ Xiaomi TV S Mini LED 55 2025 向けの、HDMI入力とアプリ一覧だけを�
 
 ## ビルド
 
-Android SDK 36、Build Tools 35.0.0、JDK 17以降（Gradle 8.13が対応するバージョン）を用意し、`local.properties` に `sdk.dir=/path/to/Android/sdk` を記入します。対象SDKも36です。
+Android SDK 36、Build Tools 35.0.0、JDK 17以降（Gradle 8.13が対応するバージョン）を用意し、`local.properties` に `sdk.dir=/path/to/Android/sdk` を記入します。対象SDKも36です。KotlinコンパイラはGradleが取得するため、別途インストールする必要はありません。
 
 ```sh
 ./gradlew assembleDebug lintDebug assembleDebugAndroidTest
@@ -30,7 +30,11 @@ sh scripts/test-rules.sh
 python3 scripts/test-restore.py
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`。個人用のデバッグ署名APKです。同じ署名鍵を使って更新してください。Gradleは初回のみビルド用依存を取得します。アプリ本体に追加ライブラリはありません。
+APK: `app/build/outputs/apk/debug/app-debug.apk`。個人用のデバッグ署名APKです。同じ署名鍵を使って更新してください。Gradleは初回のみビルド用依存を取得します。アプリ本体はAndroid標準APIとKotlin標準ライブラリを使用し、単体テストにはJUnit 4を使用します。
+
+アプリ本体は `app/src/main/kotlin/com/beryu/tvhome/` にあります。`MainActivity.kt` が画面とライフサイクル、`TileView.kt` がカード描画、`InputRepository.kt` がHDMI入力の取得を担当します。入力名・Homeキー・テーマの判定はAndroidに依存しない `*Rules.kt` に分けています。Gradle設定もKotlin DSL（`*.gradle.kts`）です。Kotlin 2.3.20と既存のAGP 8.13.2の組み合わせは、[Kotlinの互換性表](https://kotlinlang.org/docs/gradle-configure-project.html)を確認して選んでいます。
+
+`sh scripts/test-rules.sh` はGradleの `:app:testDebugUnitTest` を実行し、`app/src/test/kotlin/` のルールを検証します。Android SDKは必要ですが、接続端末は不要です。画面操作のテストは `app/src/androidTest/kotlin/` にあり、下記の手順で端末上から明示的に実行します。
 
 ## テレビにインストール
 
