@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class MainActivity extends Activity {
     private TvInputManager inputManager;
@@ -45,6 +46,10 @@ public class MainActivity extends Activity {
     private GridView grid;
     private Object backCallback;
     private boolean settingsFocused;
+    private LinearLayout currentRoot;
+    private LinearLayout homeRoot;
+    private List<InputEntry> homeEntries;
+    private String homeError;
     private final Runnable refresh = () -> { if (!drawerOpen) loadHome(); };
     private final TvInputManager.TvInputCallback callback = new TvInputManager.TvInputCallback() {
         @Override public void onInputAdded(String id) { scheduleRefresh(); }
@@ -93,7 +98,8 @@ public class MainActivity extends Activity {
         setIntent(intent);
         // The Home key always returns to the minimal home, including from the drawer.
         drawerOpen = false;
-        loadHome();
+        // Android calls onResume after onNewIntent, including when already resumed.
+        // Refresh there once instead of reading inputs and building the screen twice.
     }
 
     @Override protected void onSaveInstanceState(Bundle out) {
@@ -135,6 +141,7 @@ public class MainActivity extends Activity {
         root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 new int[]{0xFFF4F2ED, 0xFFE5E8E8}));
         setContentView(root);
+        currentRoot = root;
         return root;
     }
 
@@ -142,7 +149,20 @@ public class MainActivity extends Activity {
     void renderHome(List<InputEntry> entries, String error) {
         drawerOpen = false;
         grid = null;
+        // Re-read settings on every return, but retain the view tree when unchanged.
+        if (homeRoot != null && entries.equals(homeEntries) && Objects.equals(error, homeError)) {
+            if (currentRoot != homeRoot) {
+                setContentView(homeRoot);
+                currentRoot = homeRoot;
+            }
+            View preferred = homeRoot.findViewWithTag(selectedInput);
+            if (preferred != null && !preferred.hasFocus()) preferred.requestFocus();
+            return;
+        }
         LinearLayout root = root();
+        homeRoot = root;
+        homeEntries = new ArrayList<>(entries);
+        homeError = error;
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setClipChildren(false);
