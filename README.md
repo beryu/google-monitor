@@ -15,7 +15,7 @@ Xiaomi TV S Mini LED 55 2025 向けの、HDMI入力とアプリ一覧だけを�
 - 十字キーで移動、決定で開き、戻るで一覧からホームへ戻ります。ホーム上の戻るでは終了しません。
 - 入力名は画面に戻るたびに読み直します。HDMI入力の追加・削除・更新も監視します。
 
-インターネット権限、外部API、広告SDK、WebView、アクセシビリティサービス、常駐ポーリングはありません。OSや既存Google TVアプリ自体は変更しません。添付ポストにあるRAM削減率や高速化倍率は本アプリでは未測定です。
+インターネット権限、外部API、広告SDK、WebView、常駐ポーリングはありません。純正アプリを有効に保つため、Google TVのホーム表示だけを検知するユーザー補助サービスを利用できます。画面内容の取得とキー入力の取得は行いません。OSや既存Google TVアプリのファイル自体は変更しません。添付ポストにあるRAM削減率や高速化倍率は本アプリでは未測定です。
 
 ## ビルド
 
@@ -24,6 +24,7 @@ Android SDK 36、Build Tools 35.0.0、JDK 17以降（Gradle 8.13が対応する�
 ```sh
 ./gradlew assembleDebug lintDebug assembleDebugAndroidTest
 sh scripts/test-rules.sh
+python3 scripts/test-restore.py
 ```
 
 APK: `app/build/outputs/apk/debug/app-debug.apk`。個人用のデバッグ署名APKです。同じ署名鍵を使って更新してください。Gradleは初回のみビルド用依存を取得します。アプリ本体に追加ライブラリはありません。
@@ -51,36 +52,21 @@ adb -s TV_IP:CONNECT_PORT shell am start -n com.beryu.tvhome/.MainActivity
 
 ## ホームに設定・元に戻す
 
-まず元のホームを記録しておきます。
+Xiaomiの純正ホームとGoogle TV初期設定アプリは有効のまま使います。純正ホーム内に右側設定パネルやリモコン用受信機能があるため、これらのパッケージを無効化しないでください。
 
-```sh
-adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME
-```
+1. テレビの「設定 → システム → ユーザー補助」を開きます（メニュー名はファームウェアによって異なります）。
+2. 「Quiet TV ホーム切替」を有効にします。
+3. リモコンのHomeボタンでQuiet TVへ移動し、設定ボタンで純正の右側パネルが開くことを確認します。
 
-テレビの既定ホーム選択画面でQuiet TVを選ぶか、対応機種では次のADBコマンドを使えます。
+このサービスは `com.google.android.apps.tv.launcherx` の画面切り替えイベントだけを受け取り、純正HomeActivityが表示された場合にQuiet TVを開きます。DashboardHandlerや設定画面、他のアプリは対象外です。画面内容の取得権限、キー入力フィルタ、音声出力機能はありません。既存のButton Mapperと併用できます。
 
-```sh
-adb shell cmd package set-home-activity com.beryu.tvhome/.MainActivity
-adb shell input keyevent KEYCODE_HOME
-```
-
-元に戻す場合は、記録した元のホームのコンポーネントを指定します。例のGoogle TVパッケージ名を決め打ちせず、実機の値を使ってください。
-
-```sh
-adb shell cmd package set-home-activity ORIGINAL_PACKAGE/ORIGINAL_ACTIVITY
-# またはQuiet TVをアンインストールして元のホームを選択
-adb uninstall com.beryu.tvhome
-```
-
-アプリとして起動する場合、純正ホームの変更は不要です。ただし今回のXiaomi実機では純正ホームが高い優先度を持つため、上記の既定ホーム指定だけではHomeキーを置き換えられません。ユーザーからホーム置き換えの承認を得ています。ADBはシステムアプリのコンポーネント単位の停止を許可しないため、純正ホームとGoogle TV初期設定アプリの2パッケージをユーザー0で無効化する必要があります。Wi-Fi再接続後、保存元が `android.uid.system` へ変わったことを確認して2パッケージを無効化し、Quiet TVへの置き換えを完了しました。Homeキーでの起動、Google TV設定への導線、両HDMI入力、Wi-Fi維持を実機で確認済みです。詳細とリスクは `docs/DEVICE-VALIDATION.md` を参照してください。
-
-この追加変更を行った後に元に戻すには、**Quiet TVを削除する前に**以下を実行します。
+純正ホームへ戻すには、ユーザー補助設定で「Quiet TV ホーム切替」を無効にします。1.0.3以前の手順で純正パッケージを停止した場合や、ADBから戻す場合は次を実行します。
 
 ```sh
 ADB=/path/to/adb sh scripts/restore-google-tv.sh TV_IP:PORT
 ```
 
-追加変更後はQuiet TVのアンインストールだけでは元のホームへ戻りません。先に2つのパッケージの有効状態を復元してください。
+スクリプトはQuiet TVの補助サービスだけを有効サービス一覧から取り除き、他のユーザー補助サービスを保持して、純正2パッケージと既定ホームを復元します。Quiet TVを削除する場合は先に復元してください。詳しくは [システム機能との共存](docs/SYSTEM-INTEGRATION.md) を参照してください。
 
 ## 互換性と実機確認
 
