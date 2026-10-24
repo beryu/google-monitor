@@ -2,6 +2,8 @@
 
 Xiaomi TV S Mini LED 55 2025 向けの、HDMI入力とアプリ一覧だけを置くAndroid TV / Google TVランチャー。
 
+![Quiet TVのホーム画面](docs/images/home-screen.png)
+
 ## 表示と操作
 
 - Google TVのHDMI入力設定で付けた名前を、そのままカード名に使います。
