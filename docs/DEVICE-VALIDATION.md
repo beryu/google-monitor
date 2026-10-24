@@ -1,9 +1,9 @@
 # Xiaomi実機の検証 — 2026-10-24
 
 - 実機: Xiaomi TV S Mini LED 55 2025（ADBモデル名 `MiTV-MOEU0`）、Android 14。
-- アプリ: `com.beryu.tvhome` / Quiet TV 1.0.4。compileSdk / targetSdk 36、minSdk 26。
-- インストール済みAPK: `artifacts/quiet-tv-1.0.4.apk`（26,199 bytes）。
-- SHA-256: `ecac80a6b77f9c66e9ce9a96c63c7933889c69bf8c082294caff9f55d0a9128c`。
+- アプリ: `com.beryu.tvhome` / Quiet TV 1.0.5。compileSdk / targetSdk 36、minSdk 26。
+- インストール済みAPK: `artifacts/quiet-tv-1.0.5.apk`（28,365 bytes）。
+- SHA-256: `4a279beb1164ff6281888164d16575d7a05b8e1ad3f56a32e5e8787c4d77d683`。
 
 ## 1.0.3での初期検証
 
@@ -45,3 +45,13 @@
 参考: [Google TVの初期化](https://support.google.com/googletv/answer/10070482?hl=ja)、[Xiaomiの初期化案内（別機種のTV A 55 2025）](https://www.mi.com/global/support/faq/details/KA-481125/)、[AndroidのADBによるパッケージ有効状態の変更制限](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android13-dev/services/core/java/com/android/server/pm/PackageManagerService.java)。
 
 待機復帰後のQuiet TV表示は確認済みです。再起動・ファームウェア更新後のHomeキー動作は未検証です。
+
+## 直接Home起動の追加検証（1.0.5）
+
+Homeボタンで純正ホームが先に表示されるという申告に対し、既存Button MapperでHomeを登録する方法を確認しましたが、物理リモコンでも登録一覧に追加されませんでした。既存の音量・BUTTON_6設定は変更していません。
+
+別の任意サービス `HomeKeyService` を実装し、1.0.5を実機へインストールしました。Homeの先行処理にキーイベント受信権限を使うため、追加同意を得てから有効化しました。従来のHomeRedirectServiceとButton Mapperも有効のままです。
+
+設定画面から物理Homeキーを押すテストで、ユーザーが純正画面を挟まずQuiet TVが開いたことを確認しました。画面遷移ログでも純正HomeActivity / VanillaModeHomeActivityのresumeは0件でした。右側設定パネルの表示と、戻るキーでの復帰も確認済みです。
+
+ビルド・Lintに成功し、入力11件・表示分離10件・キー処理14件・復元8件の計43テストが通っています。詳細と制約は `docs/DIRECT-HOME.md` を参照してください。

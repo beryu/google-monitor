@@ -13,7 +13,9 @@ remaining_services=$(printf '%s\n' "$current_services" | awk -F ':' '
         for (i = 1; i <= NF; i++) {
             if ($i == "null" || $i == "" ||
                 $i == "com.beryu.tvhome/.HomeRedirectService" ||
-                $i == "com.beryu.tvhome/com.beryu.tvhome.HomeRedirectService") continue
+                $i == "com.beryu.tvhome/com.beryu.tvhome.HomeRedirectService" ||
+                $i == "com.beryu.tvhome/.HomeKeyService" ||
+                $i == "com.beryu.tvhome/com.beryu.tvhome.HomeKeyService") continue
             result = result (result == "" ? "" : ":") $i
         }
         print result
