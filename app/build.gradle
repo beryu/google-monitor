@@ -1,0 +1,19 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.beryu.tvhome'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.beryu.tvhome'
+        minSdk 26
+        targetSdk 36
+        versionCode 4
+        versionName '1.0.3'
+        testInstrumentationRunner 'com.beryu.tvhome.SmokeInstrumentation'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    lint { abortOnError true }
+}
