@@ -9,7 +9,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.graphics.Color;
+import android.content.res.ColorStateList;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputManager;
@@ -31,6 +32,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.text.Collator;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,6 +53,13 @@ public class MainActivity extends Activity {
     private LinearLayout homeRoot;
     private List<InputEntry> homeEntries;
     private String homeError;
+    private TextView homeMessage;
+    private ThemePalette theme = ThemeRules.isDark(Instant.now()) ? ThemePalette.DARK : ThemePalette.LIGHT;
+    private boolean clockRegistered;
+    private final Runnable themeRefresh = this::refreshTheme;
+    private final BroadcastReceiver clockChanges = new BroadcastReceiver() {
+        @Override public void onReceive(Context c, Intent intent) { refreshTheme(); }
+    };
     private final Runnable refresh = () -> { if (!drawerOpen) loadHome(); };
     private final TvInputManager.TvInputCallback callback = new TvInputManager.TvInputCallback() {
         @Override public void onInputAdded(String id) { scheduleRefresh(); }
@@ -63,6 +73,7 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        getWindow().setBackgroundDrawable(new ColorDrawable(theme.backgroundStart));
         if (state != null) {
             drawerOpen = state.getBoolean("drawer");
             selectedInput = state.getString("input", "");
@@ -90,7 +101,68 @@ public class MainActivity extends Activity {
         super.onResume();
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        if (!clockRegistered) {
+            IntentFilter clockFilter = new IntentFilter(Intent.ACTION_TIME_CHANGED);
+            clockFilter.addAction(Intent.ACTION_TIMEZONE_CHANGED);
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(clockChanges, clockFilter, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                registerReceiver(clockChanges, clockFilter);
+            }
+            clockRegistered = true;
+        }
+        refreshTheme();
         if (drawerOpen) showApps(); else loadHome();
+    }
+
+    @Override protected void onPause() {
+        handler.removeCallbacks(themeRefresh);
+        if (clockRegistered) {
+            unregisterReceiver(clockChanges);
+            clockRegistered = false;
+        }
+        super.onPause();
+    }
+
+    private void refreshTheme() {
+        Instant now = Instant.now();
+        updateTheme(now);
+        // One callback at the next boundary; no polling while visible or in the background.
+        handler.removeCallbacks(themeRefresh);
+        handler.postDelayed(themeRefresh, Math.max(1, Duration.between(now, ThemeRules.nextChange(now)).toMillis()));
+    }
+
+    // Package visible for deterministic boundary and focus checks on a device.
+    void updateTheme(Instant now) {
+        ThemePalette next = ThemeRules.isDark(now) ? ThemePalette.DARK : ThemePalette.LIGHT;
+        if (theme == next) return;
+        theme = next;
+        getWindow().setBackgroundDrawable(new ColorDrawable(theme.backgroundStart));
+        if (homeRoot != null) applyThemeToRoot(homeRoot);
+        if (currentRoot != null && currentRoot != homeRoot) applyThemeToRoot(currentRoot);
+    }
+
+    private void applyThemeToRoot(LinearLayout root) {
+        root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{theme.backgroundStart, theme.backgroundEnd}));
+        applyThemeToChildren(root);
+    }
+
+    private void applyThemeToChildren(View view) {
+        if (view instanceof TileView) {
+            ((TileView) view).applyTheme(theme);
+        } else if (view instanceof TextView) {
+            ((TextView) view).setTextColor(view == homeMessage ? theme.muted : theme.foreground);
+            if (view instanceof Button) {
+                view.setBackgroundTintList(new ColorStateList(new int[][]{
+                        new int[]{android.R.attr.state_pressed}, new int[]{android.R.attr.state_focused}, new int[]{}
+                }, new int[]{theme.focusedButton, theme.focusedButton, theme.button}));
+            }
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) applyThemeToChildren(group.getChildAt(i));
+        }
     }
 
     @Override protected void onNewIntent(Intent intent) {
@@ -138,8 +210,7 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
         root.setPadding(dp(42), dp(24), dp(42), dp(24));
-        root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{0xFFF4F2ED, 0xFFE5E8E8}));
+        applyThemeToRoot(root);
         setContentView(root);
         currentRoot = root;
         return root;
@@ -163,6 +234,7 @@ public class MainActivity extends Activity {
         homeRoot = root;
         homeEntries = new ArrayList<>(entries);
         homeError = error;
+        homeMessage = null;
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setClipChildren(false);
@@ -187,7 +259,7 @@ public class MainActivity extends Activity {
             }
             final InputEntry entry = i < entries.size() ? entries.get(i) : null;
             TileView tile = new TileView(this, entry == null ? "すべてのアプリ" : entry.label,
-                    null, entry == null, false);
+                    null, entry == null, false, theme);
             String key = entry == null ? "apps" : entry.id;
             tile.setTag(key);
             tile.setOnClickListener(v -> {
@@ -212,8 +284,9 @@ public class MainActivity extends Activity {
         }
         if (entries.isEmpty()) {
             TextView message = new TextView(this);
+            homeMessage = message;
             message.setText(error != null ? error : "表示できるHDMI入力がありません。Google TVの入力設定をご確認ください。");
-            message.setTextColor(0xFF626B70);
+            message.setTextColor(theme.muted);
             message.setTextSize(14);
             message.setGravity(Gravity.CENTER);
             message.setPadding(dp(12), dp(20), dp(12), 0);
@@ -241,7 +314,7 @@ public class MainActivity extends Activity {
         TextView title = new TextView(this);
         title.setText("すべてのアプリ");
         title.setTextSize(25);
-        title.setTextColor(0xFF29333B);
+        title.setTextColor(theme.foreground);
         title.setPadding(dp(7), 0, 0, dp(14));
         header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
         Button settingsButton = new Button(this);
@@ -249,6 +322,7 @@ public class MainActivity extends Activity {
         settingsButton.setTextSize(14);
         settingsButton.setAllCaps(false);
         settingsButton.setTag("tv-settings");
+        applyThemeToChildren(settingsButton);
         settingsButton.setId(View.generateViewId());
         settingsButton.setOnClickListener(v -> {
             settingsFocused = true;
@@ -281,7 +355,7 @@ public class MainActivity extends Activity {
                 android.graphics.drawable.Drawable drawable = null;
                 try { drawable = app.info.loadIcon(getPackageManager()); }
                 catch (RuntimeException e) { Log.w("QuietTV", "App icon unavailable", e); }
-                TileView tile = new TileView(MainActivity.this, app.label, drawable, drawable == null, true);
+                TileView tile = new TileView(MainActivity.this, app.label, drawable, drawable == null, true, theme);
                 // GridView owns D-pad focus and selection; children mirror its selection.
                 tile.setFocusable(false);
                 tile.setClickable(false);
