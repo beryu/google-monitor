@@ -15,6 +15,7 @@ Xiaomi TV S Mini LED 55 2025 向けの、HDMI入力とアプリ一覧だけを�
 - 「すべてのアプリ」は起動可能なTVアプリと通常アプリをパッケージ単位でまとめて表示します。起動画面のないシステムサービスは対象外です。上部に「Google TVの設定」ボタンがあり、十字キーの上で移動できます。設定アプリも一覧に含めます。
 - 十字キーで移動、決定で開き、戻るで一覧からホームへ戻ります。ホーム上の戻るでは終了しません。
 - 入力名は画面に戻るたびに読み直します。HDMI入力の追加・削除・更新も監視します。
+- Home復帰時の入力取得は1回にまとめ、入力ID・名前・表示対象が変わらなければホームのカードを再利用します。アプリ一覧から戻る場合もホームを再利用し、選択位置を維持します。
 
 インターネット権限、外部API、広告SDK、WebView、常駐ポーリングはありません。純正アプリを有効に保つため、Google TVのホーム表示だけを検知するユーザー補助サービスを利用できます。画面内容は取得しません。任意のHome直接起動機能のみキーイベント受信の権限を使い、Home以外は通過させます。入力の記録・保存・送信は行いません。OSや既存Google TVアプリのファイル自体は変更しません。添付ポストにあるRAM削減率や高速化倍率は本アプリでは未測定です。
 
@@ -97,5 +98,13 @@ adb shell am instrument -w com.beryu.tvhome.test/com.beryu.tvhome.SmokeInstrumen
 ```
 
 初期フォーカス、十字キー移動、アプリ一覧、一覧内移動、設定ボタンへの移動と設定Intent、戻るを確認し、ホームとアプリ一覧のスクリーンショットをアプリの内部ファイル領域に保存します。デバッグAPKでは `adb exec-out run-as com.beryu.tvhome cat files/apps-preview.png > apps.png` で取り出せます。
+
+ホームの再利用、入力名の変更・入力の削除、エラー復旧とHome Intentによる一覧からの復帰も確認します。操作テストは対象プロセスを停止するため、終了後は通常起動し、既に許可したQuiet TVのユーザー補助サービスが接続中であることを確認してください。切断されている場合は、そのサービスだけを設定からOFF→ONにします。
+
+Home復帰時のアプリ内処理だけを比較する場合は、同じテストAPKを各バージョンに対して次のように実行します。5回のウォームアップ後に31回測定し、中央値・p90とカードの作り直し回数を出します。リモコン入力からの表示時間、描画・画面遷移、テレビの電源復帰、コールド起動は含みません。
+
+```sh
+adb shell am instrument -w -e benchmark true com.beryu.tvhome.test/com.beryu.tvhome.SmokeInstrumentation
+```
 
 先行研究: [simbasjungles/free-my-tv](https://github.com/simbasjungles/free-my-tv)。`HomeApps.java` の物理HDMIとCEC子入力の整理、設定名の優先、HDMI URI、`ANDROID_SETTINGS` の `Settings.ACTION_SETTINGS` 導線を確認して参考にしています。本プロジェクトはコードや素材をコピーせず独立して実装しています。
