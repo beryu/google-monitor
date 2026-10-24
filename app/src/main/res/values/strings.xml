@@ -1,4 +1,6 @@
 <resources>
     <string name="home_redirect_name">Quiet TV ホーム切替</string>
     <string name="home_redirect_description">純正ホームの表示を検知してQuiet TVを開きます。純正の設定パネルとシステム機能を有効のまま使えます。画面の内容やキー入力は取得しません。無効にすると純正ホームへ戻ります。</string>
+    <string name="home_key_name">Quiet TV Homeボタン直接起動</string>
+    <string name="home_key_description">Homeキーを純正ホームが開く前に処理し、Quiet TVを直接開きます。Androidの仕組み上キーイベントを受信しますが、Home以外はそのまま通し、入力の記録・保存・送信は行いません。画面内容は取得しません。Homeの長押し・連打もQuiet TV起動として扱います。有効化は任意です。</string>
 </resources>

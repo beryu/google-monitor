@@ -13,6 +13,9 @@ cases = [
     ("com.beryu.tvhome/.HomeRedirectService", ""),
     ("flar2.homebutton/a.i", None),
     ("null", ""),
+    ("flar2.homebutton/a.i:com.beryu.tvhome/.HomeKeyService", "flar2.homebutton/a.i"),
+    ("com.beryu.tvhome/com.beryu.tvhome.HomeKeyService:other.pkg/.Service", "other.pkg/.Service"),
+    ("com.beryu.tvhome/.HomeKeyService:com.beryu.tvhome/.HomeRedirectService", ""),
 ]
 with tempfile.TemporaryDirectory() as folder:
     folder = Path(folder)
@@ -39,4 +42,4 @@ if 'get' in sys.argv and 'enabled_accessibility_services' in sys.argv:
         assert writes == wanted, (current, writes, wanted)
         assert ["cmd", "package", "set-home-activity", "--user", "0",
                 "com.google.android.apps.tv.launcherx/.home.HomeActivity"] in calls
-print("5 recovery checks passed; existing accessibility services preserved.")
+print("8 recovery checks passed; existing accessibility services preserved.")
