@@ -3,6 +3,7 @@ package com.beryu.tvhome;
 import android.app.Instrumentation;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.View;
@@ -11,6 +12,10 @@ import android.widget.GridView;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.Arrays;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.TimeZone;
 
 /** Explicitly invoked smoke checks. Fixtures never appear during normal launches. */
 public final class SmokeInstrumentation extends Instrumentation {
@@ -24,7 +29,7 @@ public final class SmokeInstrumentation extends Instrumentation {
         Bundle result = new Bundle();
         try {
             MainActivity activity = (MainActivity) startActivitySync(new Intent(getTargetContext(), MainActivity.class)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
             waitForIdleSync();
             if (benchmark) {
                 benchmarkHomeReturn(activity, result);
@@ -110,17 +115,90 @@ public final class SmokeInstrumentation extends Instrumentation {
             runOnMainSync(() -> require("apps".equals(activity.getCurrentFocus().getTag()),
                     "Wrapped row remains reachable with D-pad"));
             checkHomeReuse(activity);
+            checkThemeChanges(activity);
             // Return to the real input list after the fixtures.
             runOnMainSync(() -> activity.showApps());
             sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
             waitForIdleSync();
             // Leave the real home visible after checking fixtures.
-            result.putString("stream", "PASS: home reuse, input changes, Home lifecycle, focus, D-pad movement, app drawer, settings, generic HDMI, four-card row, wrapping, Back\n");
+            result.putString("stream", "PASS: theme changes, home reuse, input changes, Home lifecycle, focus, D-pad movement, app drawer, settings, generic HDMI, four-card row, wrapping, Back\n");
             finish(-1, result);
         } catch (Throwable e) {
             result.putString("stream", "FAIL: " + e + "\n");
             finish(0, result);
         }
+    }
+
+    private void checkThemeChanges(MainActivity activity) throws Exception {
+        ZoneId zone = ZoneId.systemDefault();
+        Instant day = LocalDate.of(2026, 10, 24).atTime(17, 59, 59).atZone(zone).toInstant();
+        Instant night = LocalDate.of(2026, 10, 24).atTime(18, 0).atZone(zone).toInstant();
+        final View[] homeTile = new View[1];
+        final GridView[] drawer = new GridView[1];
+        runOnMainSync(() -> {
+            activity.renderHome(Arrays.asList(new InputEntry("theme-1", "Nintendo Switch 2"),
+                    new InputEntry("theme-2", "PlayStation 5"), new InputEntry("theme-3", "HDMI 3")), null);
+            homeTile[0] = activity.getWindow().getDecorView().findViewWithTag("theme-2");
+            homeTile[0].requestFocus();
+            activity.updateTheme(day);
+        });
+        waitForIdleSync();
+        screenshot("home-light-preview.png");
+        runOnMainSync(() -> {
+            requireTileColor(homeTile[0], ThemePalette.LIGHT.focusedCard);
+            activity.updateTheme(night);
+            requireTileColor(homeTile[0], ThemePalette.DARK.focusedCard);
+            require(activity.getCurrentFocus() == homeTile[0], "Theme preserves home focus");
+            require(activity.getWindow().getDecorView().findViewWithTag("theme-2") == homeTile[0],
+                    "Theme reuses home cards");
+        });
+        waitForIdleSync();
+        screenshot("home-dark-preview.png");
+        runOnMainSync(() -> {
+            activity.showApps();
+            drawer[0] = findGrid(activity.getWindow().getDecorView());
+            // Earlier settings checks intentionally retain focus on the settings button.
+            drawer[0].requestFocus();
+            drawer[0].setSelection(Math.min(1, drawer[0].getCount() - 1));
+        });
+        waitForIdleSync();
+        final int[] position = new int[1];
+        runOnMainSync(() -> {
+            position[0] = drawer[0].getSelectedItemPosition();
+            activity.updateTheme(day);
+            require(findGrid(activity.getWindow().getDecorView()) == drawer[0], "Theme retains drawer");
+            require(drawer[0].getSelectedItemPosition() == position[0], "Theme preserves app selection");
+            require(drawer[0].hasFocus(), "Theme preserves drawer focus");
+            activity.updateTheme(night);
+            View settings = activity.getWindow().getDecorView().findViewWithTag("tv-settings");
+            settings.requestFocus();
+            activity.updateTheme(day);
+            require(activity.getCurrentFocus() == settings, "Theme preserves settings focus");
+            activity.updateTheme(night);
+        });
+        waitForIdleSync();
+        screenshot("apps-dark-preview.png");
+        runOnMainSync(() -> {
+            activity.renderHome(Arrays.asList(new InputEntry("theme-1", "Nintendo Switch 2"),
+                    new InputEntry("theme-2", "PlayStation 5"), new InputEntry("theme-3", "HDMI 3")), null);
+            require(activity.getWindow().getDecorView().findViewWithTag("theme-2") == homeTile[0],
+                    "Theme updates retained home while drawer is visible");
+            // Change only this process's default zone; leave the TV's system settings intact.
+            TimeZone original = TimeZone.getDefault();
+            try {
+                Instant sameTime = Instant.parse("2026-10-24T09:00:00Z");
+                TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+                activity.updateTheme(sameTime);
+                requireTileColor(homeTile[0], ThemePalette.LIGHT.focusedCard);
+                TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"));
+                activity.updateTheme(sameTime);
+                requireTileColor(homeTile[0], ThemePalette.DARK.focusedCard);
+                require(activity.getCurrentFocus() == homeTile[0], "Zone change preserves home focus");
+            } finally {
+                TimeZone.setDefault(original);
+                activity.updateTheme(Instant.now());
+            }
+        });
     }
 
     private void checkHomeReuse(MainActivity activity) {
@@ -206,11 +284,21 @@ public final class SmokeInstrumentation extends Instrumentation {
                 samples[15] / 1_000_000.0, samples[27] / 1_000_000.0, replaced[0]));
     }
     private void screenshot(String name) throws Exception {
+        // UI idleness can precede the next display frame on this TV.
+        waitForIdleSync();
+        android.os.SystemClock.sleep(250);
         Bitmap bitmap = getUiAutomation().takeScreenshot();
         require(bitmap != null, "Screenshot available");
         File file = new File(getTargetContext().getFilesDir(), name);
         try (FileOutputStream out = new FileOutputStream(file)) { bitmap.compress(Bitmap.CompressFormat.PNG, 100, out); }
         bitmap.recycle();
+    }
+    private static void requireTileColor(View view, int expected) {
+        Bitmap bitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(), Bitmap.Config.ARGB_8888);
+        view.draw(new Canvas(bitmap));
+        int color = bitmap.getPixel(view.getWidth() / 2, view.getHeight() / 5);
+        bitmap.recycle();
+        require(color == expected, "Theme updates rendered card color");
     }
     private static GridView findGrid(View view) {
         if (view instanceof GridView) return (GridView) view;

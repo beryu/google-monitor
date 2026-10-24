@@ -2,7 +2,6 @@ package com.beryu.tvhome;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Typeface;
@@ -21,13 +20,15 @@ final class TileView extends View {
     private final boolean apps;
     private final boolean compact;
     private final RectF rect = new RectF();
+    private ThemePalette theme;
 
-    TileView(Context context, String label, Drawable icon, boolean apps, boolean compact) {
+    TileView(Context context, String label, Drawable icon, boolean apps, boolean compact, ThemePalette theme) {
         super(context);
         this.label = label;
         this.icon = icon;
         this.apps = apps;
         this.compact = compact;
+        this.theme = theme;
         setFocusable(true);
         setClickable(true);
         setContentDescription(label);
@@ -36,6 +37,11 @@ final class TileView extends View {
     }
 
     private float dp(float value) { return value * getResources().getDisplayMetrics().density; }
+
+    void applyTheme(ThemePalette theme) {
+        this.theme = theme;
+        invalidate();
+    }
 
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         setMeasuredDimension(MeasureSpec.getSize(widthSpec), resolveSize((int) dp(compact ? 116 : 188), heightSpec));
@@ -46,20 +52,20 @@ final class TileView extends View {
         float w = getWidth(), h = getHeight();
         boolean active = hasFocus() || isSelected();
         InputRules.Brand brand = !compact && !apps ? InputRules.brand(label) : InputRules.Brand.NONE;
-        int foreground = brand == InputRules.Brand.NINTENDO ? 0xFFE60012
-                : brand == InputRules.Brand.PLAYSTATION ? 0xFF0070CC
-                : 0xFF29333B;
+        int foreground = brand == InputRules.Brand.NINTENDO ? theme.nintendo
+                : brand == InputRules.Brand.PLAYSTATION ? theme.playstation
+                : theme.foreground;
         float inset = dp(7), radius = dp(compact ? 14 : 21);
         rect.set(inset, inset, w - inset, h - inset);
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(active ? Color.WHITE : Color.rgb(247, 247, 244));
-        paint.setShadowLayer(dp(active ? 6 : 2), 0, dp(2), active ? 0x22303A43 : 0x10303A43);
+        paint.setColor(active ? theme.focusedCard : theme.card);
+        paint.setShadowLayer(dp(active ? 6 : 2), 0, dp(2), active ? theme.focusedShadow : theme.shadow);
         canvas.drawRoundRect(rect, radius, radius, paint);
         paint.clearShadowLayer();
         if (active) {
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(dp(2));
-            paint.setColor(0xFF566B7A);
+            paint.setColor(theme.focusRing);
             canvas.drawRoundRect(rect, radius, radius, paint);
             paint.setStyle(Paint.Style.FILL);
         }
@@ -70,7 +76,7 @@ final class TileView extends View {
                     (int)(w / 2 + size / 2f), (int)(centerY + size / 2f));
             icon.draw(canvas);
         } else if (apps) {
-            paint.setColor(0xFF44515B);
+            paint.setColor(theme.icon);
             float cell = dp(9), gap = dp(5), total = cell * 3 + gap * 2;
             for (int y = 0; y < 3; y++) for (int x = 0; x < 3; x++) {
                 float left = w / 2 - total / 2 + x * (cell + gap);
