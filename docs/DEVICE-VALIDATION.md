@@ -1,9 +1,9 @@
 # Xiaomi実機の検証 — 2026-10-24
 
 - 実機: Xiaomi TV S Mini LED 55 2025（ADBモデル名 `MiTV-MOEU0`）、Android 14。
-- アプリ: `com.beryu.tvhome` / Quiet TV 1.0.5。compileSdk / targetSdk 36、minSdk 26。
-- インストール済みAPK: `artifacts/quiet-tv-1.0.5.apk`（28,365 bytes）。
-- SHA-256: `4a279beb1164ff6281888164d16575d7a05b8e1ad3f56a32e5e8787c4d77d683`。
+- アプリ: `com.beryu.tvhome` / Quiet TV 1.0.6。compileSdk / targetSdk 36、minSdk 26。
+- インストール済みAPK: `artifacts/quiet-tv-1.0.6.apk`（28,437 bytes）。
+- SHA-256: `9bf8d49b8bc030f3a014d0af947984bc282a9141b93d6678ffb8259f8a0a5ab6`。
 
 ## 1.0.3での初期検証
 
@@ -55,3 +55,15 @@ Homeボタンで純正ホームが先に表示されるという申告に対し�
 設定画面から物理Homeキーを押すテストで、ユーザーが純正画面を挟まずQuiet TVが開いたことを確認しました。画面遷移ログでも純正HomeActivity / VanillaModeHomeActivityのresumeは0件でした。右側設定パネルの表示と、戻るキーでの復帰も確認済みです。
 
 ビルド・Lintに成功し、入力11件・表示分離10件・キー処理14件・復元8件の計43テストが通っています。詳細と制約は `docs/DIRECT-HOME.md` を参照してください。
+
+## 全HDMI入力の表示（1.0.6）
+
+入力名による絞り込みを削除し、Google TVで非表示にされていないHDMI入力をすべて表示します。非表示判定とCEC子入力の重複防止は維持しています。Switch／PlayStationの名前判定は文字色にだけ使います。
+
+カードは最大4列とし、一般名の入力を含む3入力＋アプリ一覧を1行で表示します。複数行になる場合も最終行のカード幅を揃えます。HDMIがない場合の案内からもゲーム機名の条件を取り除きました。
+
+ビルド・Lintと既存43テストは成功。一般名の入力、4枚の1行表示、複数行での幅維持と十字キー移動を含む実機操作テストも成功しました。1.0.6は実機へインストール済みです。
+
+実機の `Aux`（HDMI 2 / HW3）はGoogle TVで非表示に設定されていることを確認し、その設定を変更せず表示しないことをUIで確認しました。Switch・Playstation・すべてのアプリは表示されています。テスト用APKと生成画像は実機から削除済みです。
+
+APK: `artifacts/quiet-tv-1.0.6.apk`（28,437 bytes）。SHA-256: `9bf8d49b8bc030f3a014d0af947984bc282a9141b93d6678ffb8259f8a0a5ab6`。

@@ -23,9 +23,7 @@ final class InputRepository {
             TvInputInfo parent = byId.get(info.getParentId());
             if (parent != null && parent.getType() == TvInputInfo.TYPE_HDMI) continue;
             String label = InputRules.label(info.loadCustomLabel(context), info.loadLabel(context));
-            if (InputRules.brand(label) != InputRules.Brand.NONE) {
-                entries.add(new InputEntry(info.getId(), label));
-            }
+            entries.add(new InputEntry(info.getId(), label));
         }
         entries.sort(Comparator.comparingInt((InputEntry e) -> e.brand.ordinal())
                 .thenComparing(e -> e.label).thenComparing(e -> e.id));
